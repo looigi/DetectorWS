@@ -188,20 +188,37 @@ Public Class _Default
 										For Each Riga As String In Righe
 											If Riga.Trim <> "" Then
 												Dim Campi() As String = Riga.Split(";")
-												Dim Lat As String = Campi(0)
-												Dim Lon As String = Campi(1)
-												Dim Quando As String = Campi(2)
-												Dim NomeFile As String = Campi(5)
-												Dim Tipologia As String = Campi(6)
+												If Riga.Contains("V") Then
+													Dim Lat As String = Campi(0)
+													Dim Lon As String = Campi(1)
+													Dim Quando As String = Campi(2)
+													Dim NomeFile As String = Campi(3)
+													Dim Tipologia As String = Campi(4)
 
-												Sql = "Insert Into Multimedia Values (" &
-													"'" & Datella & "', " &
-													"'" & Quando & "', " &
-													"'" & Lat & "', " &
-													"'" & Lon & "', " &
-													"'" & NomeFile & "'," &
-													"'" & Tipologia & "'" &
-													")"
+													Sql = "Insert Into Multimedia Values (" &
+														"'" & Datella & "', " &
+														"'" & Quando & "', " &
+														"'" & Lat & "', " &
+														"'" & Lon & "', " &
+														"'" & NomeFile & "'," &
+														"'" & Tipologia & "'" &
+														")"
+												Else
+													Dim Lat As String = Campi(0)
+													Dim Lon As String = Campi(1)
+													Dim Quando As String = Campi(2)
+													Dim NomeFile As String = Campi(5)
+													Dim Tipologia As String = Campi(6)
+
+													Sql = "Insert Into Multimedia Values (" &
+														"'" & Datella & "', " &
+														"'" & Quando & "', " &
+														"'" & Lat & "', " &
+														"'" & Lon & "', " &
+														"'" & NomeFile & "'," &
+														"'" & Tipologia & "'" &
+														")"
+												End If
 												Dim Ritorno As String = EsegueSql(Conn, Sql, Connessione)
 
 												If Ritorno.Contains("Errore: ") Then
