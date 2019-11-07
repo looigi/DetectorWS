@@ -44,6 +44,10 @@ Public Class _Default
 				STthread_Data.FileLog = FileLog
 				STthread_Data.vNomeFile = vNomeFile
 
+				ScriveLog(FileLog, NomeFileLog, "Arrivato zip: " & vNomeFile)
+
+				ElaboraInizio(STthread_Data)
+
 				Dim multiThread As Thread = New Thread(AddressOf Elabora)
 				multiThread.SetApartmentState(ApartmentState.MTA)
 				multiThread.Start(STthread_Data)
@@ -67,17 +71,20 @@ Public Class _Default
 		gf.ChiudeFileDiTestoDopoScrittura()
 	End Sub
 
-	Private Sub Elabora(strDati As dati)
+	Private Sub ElaboraInizio(strDati As dati)
 		Dim gf As GestioneFilesDirectory = strDati.gf
-		Dim MyFileCollection As HttpFileCollection = strDati.myFileCollection
 		Dim vNomeFile As String = strDati.vNomeFile
 		Dim FileLog As String = strDati.FileLog
 		Dim NomeFileLog As String = strDati.NomeFileLog
+		Dim MyFileCollection As HttpFileCollection = strDati.myFileCollection
+
+		ScriveLog(FileLog, NomeFileLog, "Entrato in ElaboraInizio")
 
 		Dim FilePath As String = Server.MapPath(".") & "\Scaricati"
 		Dim FileUnzip As String = Server.MapPath(".") & "\Scaricati\Unzip"
 		Dim FileArchiviati As String = Server.MapPath(".") & "\Scaricati\Archiviati"
 		Dim FileRovinati As String = Server.MapPath(".") & "\Scaricati\Rovinati"
+		Dim FileBackup As String = Server.MapPath(".") & "\Scaricati\Backup"
 		Dim Contatore As Integer = 0
 		Dim Altro As String = ""
 
@@ -85,8 +92,39 @@ Public Class _Default
 		gf.CreaDirectoryDaPercorso(FileArchiviati & "\")
 		gf.CreaDirectoryDaPercorso(FileUnzip & "\")
 		gf.CreaDirectoryDaPercorso(FileRovinati & "\")
+		gf.CreaDirectoryDaPercorso(FileBackup & "\")
+
+		If Not MyFileCollection Is Nothing Then
+			If File.Exists(FilePath & "\" & vNomeFile) Then
+				ScriveLog(FileLog, NomeFileLog, "Elimino il file già esistente in " & FilePath & "\" & vNomeFile)
+				File.Delete(FilePath & "\" & vNomeFile)
+			End If
+
+			ScriveLog(FileLog, NomeFileLog, "Salvo il file in " & FilePath & "\" & vNomeFile)
+			MyFileCollection(0).SaveAs(FilePath & "\" & vNomeFile)
+
+			Dim est As String = gf.TornaEstensioneFileDaPath(vNomeFile)
+			vNomeFile = vNomeFile.Replace(est, "")
+			vNomeFile = vNomeFile & "_" & Now.Year & Format(Now.Month, 0) & Format(Now.Day, "00") & Format(Now.Hour, "00") & Format(Now.Minute, "00") & Format(Now.Second, "00")
+			vNomeFile &= est
+
+			ScriveLog(FileLog, NomeFileLog, "Salvo il file in " & FileBackup & "\" & vNomeFile)
+			MyFileCollection(0).SaveAs(FileBackup & "\" & vNomeFile)
+		End If
+	End Sub
+
+	Private Sub Elabora(strDati As dati)
+		Dim gf As GestioneFilesDirectory = strDati.gf
+		Dim FileLog As String = strDati.FileLog
+		Dim NomeFileLog As String = strDati.NomeFileLog
+		Dim FilePath As String = Server.MapPath(".") & "\Scaricati"
+		Dim vNomeFile As String = strDati.vNomeFile
+		Dim FileUnzip As String = Server.MapPath(".") & "\Scaricati\Unzip"
+		Dim FileArchiviati As String = Server.MapPath(".") & "\Scaricati\Archiviati"
+		Dim FileRovinati As String = Server.MapPath(".") & "\Scaricati\Rovinati"
 
 		Dim Connessione As String = LeggeImpostazioniDiBase(Server.MapPath("."))
+		ScriveLog(FileLog, NomeFileLog, "Lettura connessione: " & Connessione)
 
 		If Connessione = "" Then
 			ScriveLog(FileLog, NomeFileLog, "Problemi nella lettura della connessione")
@@ -96,18 +134,10 @@ Public Class _Default
 			If Conn Is Nothing Then
 				ScriveLog(FileLog, NomeFileLog, "Problemi nell'apertura del db")
 			Else
+				ScriveLog(FileLog, NomeFileLog, "Db aperto correttamente")
+
 				Dim Rec As Object = Server.CreateObject("ADODB.Recordset")
 				Dim Sql As String = ""
-
-				If Not MyFileCollection Is Nothing Then
-					If File.Exists(FilePath & "\" & vNomeFile) Then
-						ScriveLog(FileLog, NomeFileLog, "Elimino il file già esistente in " & FilePath & "\" & vNomeFile)
-						File.Delete(FilePath & "\" & vNomeFile)
-					End If
-
-					ScriveLog(FileLog, NomeFileLog, "Salvo il file in " & FilePath & "\" & vNomeFile)
-					MyFileCollection(0).SaveAs(FilePath & "\" & vNomeFile)
-				End If
 
 				If File.Exists(FilePath & "\" & vNomeFile) Then
 					ScriveLog(FileLog, NomeFileLog, "Elaboro il file arrivato")
