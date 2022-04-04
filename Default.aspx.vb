@@ -21,10 +21,12 @@ Public Class _Default
 			vNomeFile = Request.Form("nomefile")
 		End If
 
-		If vNomeFile <> "" Then
-			ScriveLog(gf, "Nome file: " & vNomeFile)
+		ScriveLog(gf, "Nome file: " & vNomeFile)
 
+		If vNomeFile <> "" Then
 			Dim MyFileCollection As HttpFileCollection = Request.Files
+
+			ScriveLog(gf, "Quanti files: " & MyFileCollection.Count)
 
 			If MyFileCollection.Count > 0 Then
 				Elabora(gf, MyFileCollection, vNomeFile)
@@ -37,6 +39,8 @@ Public Class _Default
 
 		gf.ChiudeFileDiTestoDopoScrittura()
 		gf = Nothing
+
+		Response.Write("PPP")
 	End Sub
 
 	Private Sub ScriveLog(gf As GestioneFilesDirectory, Cosa As String)
@@ -49,6 +53,7 @@ Public Class _Default
 		Dim FileArchiviati As String = Server.MapPath(".") & "\Scaricati\Archiviati"
 		Dim FileRovinati As String = Server.MapPath(".") & "\Scaricati\Rovinati"
 		Dim Contatore As Integer = 0
+		Dim Ritorno As String = ""
 		Dim Altro As String = ""
 
 		gf.CreaDirectoryDaPercorso(FilePath & "\")
@@ -61,218 +66,235 @@ Public Class _Default
 		If Connessione = "" Then
 			ScriveLog(gf, "Problemi nella lettura della connessione")
 		Else
-			Dim Conn As Object = ApreDB(Connessione)
+			Dim Conn As Object = New clsGestioneDB ' = ApreDB(Connessione)
 
-			If Conn Is Nothing Then
-				ScriveLog(gf, "Problemi nell'apertura del db")
-			Else
-				Dim Rec As Object = Server.CreateObject("ADODB.Recordset")
-				Dim Sql As String = ""
+			'If Conn Is Nothing Then
+			'	ScriveLog(gf, "Problemi nell'apertura del db")
+			'Else
+			Dim Rec As Object
+			Dim Sql As String = ""
 
-				If Not MyFileCollection Is Nothing Then
-					If File.Exists(FilePath & "\" & vNomeFile) Then
-						ScriveLog(gf, "Elimino il file già esistente in " & FilePath & "\" & vNomeFile)
-						File.Delete(FilePath & "\" & vNomeFile)
-					End If
+			If Not MyFileCollection Is Nothing Then
+				vNomeFile = vNomeFile.Replace(";", "")
 
-					ScriveLog(gf, "Salvo il file in " & FilePath & "\" & vNomeFile)
-					MyFileCollection(0).SaveAs(FilePath & "\" & vNomeFile)
+				If gf.EsisteFile(FilePath & "\" & vNomeFile) Then
+					ScriveLog(gf, "Elimino il file già esistente in " & FilePath & "\" & vNomeFile)
+					gf.EliminaFileFisico(FilePath & "\" & vNomeFile)
 				End If
 
-				If File.Exists(FilePath & "\" & vNomeFile) Then
-					ScriveLog(gf, "Elaboro il file arrivato")
+				ScriveLog(gf, "Salvo il file in " & FilePath & "\" & vNomeFile)
 
-					Dim Quanti As Integer = 0
+				Dim n As String = FilePath & "\" & vNomeFile
 
-					ScriveLog(gf, "Elimino i files già presenti nella cartella di unzip")
-					gf.ScansionaDirectorySingola(FileUnzip)
+				If TipoDB <> "SQLSERVER" Then
+					n = n.Replace("\", "/")
+					n = n.Replace("//", "/")
+					n = n.Replace("/\", "/")
+				End If
 
-					Dim qq As Integer = gf.RitornaQuantiFilesRilevati
-					Dim ff() As String = gf.RitornaFilesRilevati
+				MyFileCollection(0).SaveAs(n)
+			End If
 
-					For i As Integer = 1 To qq
-						gf.EliminaFileFisico(ff(i))
-					Next
+			If gf.EsisteFile(FilePath & "\" & vNomeFile) Then
+				ScriveLog(gf, "Elaboro il file arrivato")
 
-					Try
-						Using zip As ZipFile = ZipFile.Read(FilePath & "\" & vNomeFile)
-							For Each zip_entry As ZipEntry In zip
-								ScriveLog(gf, "Unzip " & zip_entry.FileName)
-								zip_entry.Extract(FileUnzip)
-								Quanti += 1
-							Next zip_entry
-						End Using
-					Catch ex As Exception
-						ScriveLog(gf, "Unzip error: " & ex.Message)
-					End Try
+				Dim Quanti As Integer = 0
 
-					If Quanti > 0 Then
-						ScriveLog(gf, "Files unzippati: " & Quanti)
+				ScriveLog(gf, "Elimino i files già presenti nella cartella di unzip")
+				gf.ScansionaDirectorySingola(FileUnzip)
 
-						gf.LeggeFilesDaDirectory(FileUnzip)
+				Dim qq As Integer = gf.RitornaQuantiFilesRilevati
+				Dim ff() As String = gf.RitornaFilesRilevati
 
-						Dim q As Integer = gf.RitornaQuantiFilesRilevati
-						Dim filetti() As String = gf.RitornaFilesRilevati
+				For i As Integer = 1 To qq
+					gf.EliminaFileFisico(ff(i))
+				Next
 
-						For i As Integer = 1 To q
-							Dim Tipo As String
+				Dim n As String = FilePath & "\" & vNomeFile
 
-							If filetti(i).Contains("LL_") Then
-								ScriveLog(gf, "Elaborazione file posizioni " & i & "/" & q & ": " & filetti(i))
-								Tipo = "LL"
-							Else
-								ScriveLog(gf, "Elaborazione file multimedia " & i & "/" & q & ": " & filetti(i))
-								Tipo = "MM"
-							End If
+				If TipoDB <> "SQLSERVER" Then
+					n = n.Replace("\", "/")
+					n = n.Replace("//", "/")
+				End If
 
-							Dim contenuto As String = gf.LeggeFileIntero(filetti(i))
+				Try
+					Using zip As ZipFile = ZipFile.Read(n)
+						For Each zip_entry As ZipEntry In zip
+							ScriveLog(gf, "Unzip " & zip_entry.FileName)
+							zip_entry.Extract(FileUnzip)
+							Quanti += 1
+						Next zip_entry
+					End Using
+				Catch ex As Exception
+					ScriveLog(gf, "Unzip error: " & ex.Message)
+				End Try
 
-							If contenuto = "" Then
-								ScriveLog(gf, "         File vuoto. Skippo.")
-							Else
-								Dim Ok As Boolean = True
-								Dim Righe() As String = contenuto.Split("§")
+				If Quanti > 0 Then
+					ScriveLog(gf, "Files unzippati: " & Quanti)
 
-								Dim sData As String = filetti(i)
-								sData = gf.TornaNomeFileDaPath(sData)
-								sData = sData.Replace(Tipo & "_", "")
-								sData = sData.Replace(".txt", "")
-								Dim dd() As String = sData.Split("_")
-								Dim Datella As String = dd(2) & "-" & dd(1) & "-" & dd(0)
-								Dim Quante As Integer = 0
+					gf.LeggeFilesDaDirectory(FileUnzip)
 
-								Select Case Tipo
-									Case "LL"
-										' Scrive i dati su sql server per le posizioni
-										ScriveLog(gf, "Eliminazione righe posizioni per giorno " & Datella)
-										Sql = "Delete From Posizioni Where DataPos = '" & Datella & "'"
-										EsegueSql(Conn, Sql, Connessione)
+					Dim q As Integer = gf.RitornaQuantiFilesRilevati
+					Dim filetti() As String = gf.RitornaFilesRilevati
 
-										ScriveLog(gf, "Inserimento righe posizioni per giorno " & Datella)
-										For Each Riga As String In Righe
-											If Riga.Trim <> "" Then
-												Dim Campi() As String = Riga.Split(";")
-												Dim Lat As String = Campi(0)
-												Dim Lon As String = Campi(1)
-												Dim Quando As String = Campi(2)
-												Dim Velocita As String = Campi(3)
+					For i As Integer = 1 To q
+						Dim Tipo As String
 
-												Sql = "Insert Into Posizioni Values (" &
-													"'" & Datella & "', " &
-													"'" & Quando & "', " &
-													"'" & Lat & "', " &
-													"'" & Lon & "', " &
-													"'" & Velocita & "'" &
-													")"
-												Dim Ritorno As String = EsegueSql(Conn, Sql, Connessione)
+						If filetti(i).Contains("LL_") Then
+							ScriveLog(gf, "Elaborazione file posizioni " & i & "/" & q & ": " & filetti(i))
+							Tipo = "LL"
+						Else
+							ScriveLog(gf, "Elaborazione file multimedia " & i & "/" & q & ": " & filetti(i))
+							Tipo = "MM"
+						End If
 
-												If Ritorno.Contains("Errore: ") Then
-													Sql = "Delete From Posizioni Where DataPos = '" & Datella & "'"
-													EsegueSql(Conn, Sql, Connessione)
-													Ok = False
+						Dim contenuto As String = gf.LeggeFileIntero(filetti(i))
 
-													Exit For
-												End If
+						If contenuto = "" Then
+							ScriveLog(gf, "         File vuoto. Skippo.")
+						Else
+							Dim Ok As Boolean = True
+							Dim Righe() As String = contenuto.Split("§")
 
-												Quante += 1
-											End If
-										Next
-										ScriveLog(gf, "Righe posizioni inserite per giorno: " & Quante)
-									Case "MM"
-										' Scrive i dati su sql server per i multimedia
-										ScriveLog(gf, "Eliminazione righe multimedia per giorno " & Datella)
-										Sql = "Delete From Multimedia Where DataPos = '" & Datella & "'"
-										EsegueSql(Conn, Sql, Connessione)
+							Dim sData As String = filetti(i)
+							sData = gf.TornaNomeFileDaPath(sData)
+							sData = sData.Replace(Tipo & "_", "")
+							sData = sData.Replace(".txt", "")
+							Dim dd() As String = sData.Split("_")
+							Dim Datella As String = dd(2) & "-" & dd(1) & "-" & dd(0)
+							Dim Quante As Integer = 0
 
-										ScriveLog(gf, "Inserimento righe multimedia per giorno " & Datella)
-										For Each Riga As String In Righe
-											If Riga.Trim <> "" Then
-												Dim Campi() As String = Riga.Split(";")
-												If Riga.Contains("V") Then
-													Dim Lat As String = Campi(0)
-													Dim Lon As String = Campi(1)
-													Dim Quando As String = Campi(2)
-													Dim NomeFile As String = Campi(3)
-													Dim Tipologia As String = Campi(4)
+							Select Case Tipo
+								Case "LL"
+									'' Scrive i dati su sql server per le posizioni
+									'ScriveLog(gf, "Eliminazione righe posizioni per giorno " & Datella)
+									'Sql = "Delete From Posizioni Where DataPos = '" & Datella & "'"
+									'Ritorno = Conn.EsegueSql(Server.MapPath("."), Sql, Connessione)
 
-													Sql = "Insert Into Multimedia Values (" &
-														"'" & Datella & "', " &
-														"'" & Quando & "', " &
-														"'" & Lat & "', " &
-														"'" & Lon & "', " &
-														"'" & NomeFile & "'," &
-														"'" & Tipologia & "'" &
-														")"
-												Else
-													Dim Lat As String = Campi(0)
-													Dim Lon As String = Campi(1)
-													Dim Quando As String = Campi(2)
-													Dim NomeFile As String = Campi(5)
-													Dim Tipologia As String = Campi(6)
+									'ScriveLog(gf, "Inserimento righe posizioni per giorno " & Datella)
+									'For Each Riga As String In Righe
+									'	If Riga.Trim <> "" Then
+									'		Dim Campi() As String = Riga.Split(";")
+									'		Dim Lat As String = Campi(0)
+									'		Dim Lon As String = Campi(1)
+									'		Dim Quando As String = Campi(2)
+									'		Dim Velocita As String = Campi(3)
 
-													Sql = "Insert Into Multimedia Values (" &
-														"'" & Datella & "', " &
-														"'" & Quando & "', " &
-														"'" & Lat & "', " &
-														"'" & Lon & "', " &
-														"'" & NomeFile & "'," &
-														"'" & Tipologia & "'" &
-														")"
-												End If
-												Dim Ritorno As String = EsegueSql(Conn, Sql, Connessione)
+									'		Sql = "Insert Into Posizioni Values (" &
+									'			"'" & Datella & "', " &
+									'			"'" & Quando & "', " &
+									'			"'" & Lat & "', " &
+									'			"'" & Lon & "', " &
+									'			"'" & Velocita & "'" &
+									'			")"
+									'		Ritorno = Conn.EsegueSql(Server.MapPath("."), Sql, Connessione)
 
-												If Ritorno.Contains("Errore: ") Then
-													Sql = "Delete From Multimedia Where DataPos = '" & Datella & "'"
-													EsegueSql(Conn, Sql, Connessione)
-													Ok = False
+									'		If Ritorno.Contains("Errore: ") Then
+									'			Sql = "Delete From Posizioni Where DataPos = '" & Datella & "'"
+									'			Ritorno = Conn.EsegueSql(Server.MapPath("."), Sql, Connessione)
+									'			Ok = False
 
-													Exit For
-												End If
+									'			Exit For
+									'		End If
 
-												Quante += 1
-											End If
-										Next
-										ScriveLog(gf, "Righe multimedia inserite per giorno: " & Quante)
-								End Select
+									'		Quante += 1
+									'	End If
+									'Next
+									'ScriveLog(gf, "Righe posizioni inserite per giorno: " & Quante)
+								Case "MM"
+									'' Scrive i dati su sql server per i multimedia
+									'ScriveLog(gf, "Eliminazione righe multimedia per giorno " & Datella)
+									'Sql = "Delete From Multimedia Where DataPos = '" & Datella & "'"
+									'Ritorno = Conn.EsegueSql(Server.MapPath("."), Sql, Connessione)
 
-								If Ok Then
-									ScriveLog(gf, "Elaborazione effettuata. Sposto il file in archivio")
-									Dim dest As String = filetti(i)
-									dest = gf.TornaNomeFileDaPath(dest)
-									dest = FileArchiviati & "\" & dest
+									'ScriveLog(gf, "Inserimento righe multimedia per giorno " & Datella)
+									'For Each Riga As String In Righe
+									'	If Riga.Trim <> "" Then
+									'		Dim Campi() As String = Riga.Split(";")
+									'		If Riga.Contains("V") Then
+									'			Dim Lat As String = Campi(0)
+									'			Dim Lon As String = Campi(1)
+									'			Dim Quando As String = Campi(2)
+									'			Dim NomeFile As String = Campi(3)
+									'			Dim Tipologia As String = Campi(4)
 
-									gf.CopiaFileFisico(filetti(i), dest, True)
-									If File.Exists(dest) Then
-										ScriveLog(gf, "Spostato il file in archivio. Lo elimino dall'origine")
-										gf.EliminaFileFisico(filetti(i))
-									Else
-										ScriveLog(gf, "NON Spostato il file in archivio")
-									End If
+									'			Sql = "Insert Into Multimedia Values (" &
+									'				"'" & Datella & "', " &
+									'				"'" & Quando & "', " &
+									'				"'" & Lat & "', " &
+									'				"'" & Lon & "', " &
+									'				"'" & NomeFile & "'," &
+									'				"'" & Tipologia & "'" &
+									'				")"
+									'		Else
+									'			Dim Lat As String = Campi(0)
+									'			Dim Lon As String = Campi(1)
+									'			Dim Quando As String = Campi(2)
+									'			Dim NomeFile As String = Campi(5)
+									'			Dim Tipologia As String = Campi(6)
+
+									'			Sql = "Insert Into Multimedia Values (" &
+									'				"'" & Datella & "', " &
+									'				"'" & Quando & "', " &
+									'				"'" & Lat & "', " &
+									'				"'" & Lon & "', " &
+									'				"'" & NomeFile & "'," &
+									'				"'" & Tipologia & "'" &
+									'				")"
+									'		End If
+									'		Ritorno = Conn.EsegueSql(Server.MapPath("."), Sql, Connessione)
+
+									'		If Ritorno.Contains("Errore: ") Then
+									'			Sql = "Delete From Multimedia Where DataPos = '" & Datella & "'"
+									'			Ritorno = Conn.EsegueSql(Server.MapPath("."), Sql, Connessione)
+									'			Ok = False
+
+									'			Exit For
+									'		End If
+
+									'		Quante += 1
+									'	End If
+									'Next
+									'ScriveLog(gf, "Righe multimedia inserite per giorno: " & Quante)
+							End Select
+
+							If Ok Then
+								ScriveLog(gf, "Elaborazione effettuata. Sposto il file in archivio")
+								Dim dest As String = filetti(i)
+								dest = gf.TornaNomeFileDaPath(dest)
+								dest = FileArchiviati & "\TODO_" & dest
+
+								gf.CopiaFileFisico(filetti(i), dest, True)
+								If gf.EsisteFile(dest) Then
+									ScriveLog(gf, "Spostato il file in archivio. Lo elimino dall'origine")
+									gf.EliminaFileFisico(filetti(i))
 								Else
-									ScriveLog(gf, "Elaborazione NON effettuata. Sposto il file in non caricati")
-									Dim dest As String = filetti(i)
-									dest = gf.TornaNomeFileDaPath(dest)
-									dest = FileRovinati & "\" & dest
+									ScriveLog(gf, "NON Spostato il file in archivio")
+								End If
+							Else
+								ScriveLog(gf, "Elaborazione NON effettuata. Sposto il file in non caricati")
+								Dim dest As String = filetti(i)
+								dest = gf.TornaNomeFileDaPath(dest)
+								dest = FileRovinati & "\" & dest
 
-									gf.CopiaFileFisico(filetti(i), dest, True)
-									If File.Exists(dest) Then
-										ScriveLog(gf, "Spostato il file in non caricati. Lo elimino dall'origine")
-										gf.EliminaFileFisico(filetti(i))
-									Else
-										ScriveLog(gf, "NON Spostato il file in archivio")
-									End If
+								gf.CopiaFileFisico(filetti(i), dest, True)
+								If gf.EsisteFile(dest) Then
+									ScriveLog(gf, "Spostato il file in non caricati. Lo elimino dall'origine")
+									gf.EliminaFileFisico(filetti(i))
+								Else
+									ScriveLog(gf, "NON Spostato il file in archivio")
 								End If
 							End If
-						Next
+						End If
+					Next
 
-						ScriveLog(gf, "Elaborazione terminata. Elimino il file arrivato")
-						gf.EliminaFileFisico(FilePath & "\" & vNomeFile)
-					Else
-						ScriveLog(gf, "Nessun file unzippato")
-					End If
+					ScriveLog(gf, "Elaborazione terminata. Elimino il file arrivato")
+					gf.EliminaFileFisico(FilePath & "\" & vNomeFile)
 				Else
-					ScriveLog(gf, "Nessun file salvato")
+					ScriveLog(gf, "Nessun file unzippato")
 				End If
+			Else
+				ScriveLog(gf, "Nessun file salvato")
 			End If
 		End If
 	End Sub

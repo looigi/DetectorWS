@@ -1,5 +1,4 @@
 ﻿Imports System.IO
-Imports System.Text
 Imports System.Security.AccessControl
 Imports System.Runtime.InteropServices
 Imports System.ComponentModel
@@ -54,7 +53,12 @@ Public Class GestioneFilesDirectory
     End Sub
 
     Public Function TornaDimensioneFile(NomeFile As String) As Long
-        If File.Exists(NomeFile) Then
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+        End If
+
+        If EsisteFile(NomeFile) Then
             Dim infoReader As System.IO.FileInfo
             infoReader = My.Computer.FileSystem.GetFileInfo(NomeFile)
             Dim Dime As Long = infoReader.Length
@@ -90,25 +94,38 @@ Public Class GestioneFilesDirectory
         End If
         Dim Contatore As Integer = 1
 
-        Do While File.Exists(NomeFileDestinazione & "_" & Format(Contatore, "0000") & Estensione) = True
+        Dim NomeFinale As String = NomeFileDestinazione & "_" & Format(Contatore, "0000") & Estensione
+        If TipoDB <> "SQLSERVER" Then
+            NomeFinale = NomeFinale.Replace("\", "/")
+            NomeFinale = NomeFinale.Replace("//", "/")
+        End If
+
+        Do While EsisteFile(NomeFinale) = True
             Contatore += 1
+            NomeFinale = NomeFileDestinazione & "_" & Format(Contatore, "0000") & Estensione
         Loop
 
-        NomeFileDestinazione = NomeFileDestinazione & "_" & Format(Contatore, "0000") & Estensione
+        ' NomeFileDestinazione = NomeFileDestinazione & "_" & Format(Contatore, "0000") & Estensione
         gf = Nothing
 
         Return NomeFileDestinazione
     End Function
 
-    Public Function EliminaFileFisico(NomeFileOrigine As String) As String
-        If File.Exists(NomeFileOrigine) Then
+    Public Function EliminaFileFisico(NomeFile As String) As String
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+            NomeFile = NomeFile.Replace("/\", "/")
+        End If
+
+        If EsisteFile(NomeFile) Then
             Dim Ritorno As String = ""
 
-            If NomeFileOrigine.Trim <> "" Then
+            If NomeFile.Trim <> "" Then
                 Try
-                    File.Delete(NomeFileOrigine)
+                    File.Delete(NomeFile)
 
-                    Do While (System.IO.File.Exists(NomeFileOrigine) = True)
+                    Do While (EsisteFile(NomeFile) = True)
                         Threading.Thread.Sleep(1000)
                     Loop
                 Catch ex As Exception
@@ -122,10 +139,15 @@ Public Class GestioneFilesDirectory
         End If
     End Function
 
-    Public Function PrendeAttributiFile(Filetto As String) As FileAttribute
-        If File.Exists(Filetto) Then
+    Public Function PrendeAttributiFile(NomeFile As String) As FileAttribute
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+        End If
+
+        If EsisteFile(NomeFile) Then
             Dim attributes As FileAttributes
-            attributes = File.GetAttributes(Filetto)
+            attributes = File.GetAttributes(NomeFile)
 
             Return attributes
         Else
@@ -134,7 +156,12 @@ Public Class GestioneFilesDirectory
     End Function
 
     Public Sub ImpostaAttributiFile(Filetto As String, Attributi As FileAttribute)
-        If File.Exists(Filetto) Then
+        If TipoDB <> "SQLSERVER" Then
+            Filetto = Filetto.Replace("\", "/")
+            Filetto = Filetto.Replace("//", "/")
+        End If
+
+        If EsisteFile(Filetto) Then
             File.SetAttributes(Filetto, Attributi)
         End If
     End Sub
@@ -142,11 +169,19 @@ Public Class GestioneFilesDirectory
     Public Function CopiaFileFisico(NomeFileOrigine As String, NomeFileDestinazione As String, SovraScrittura As Boolean) As String
         Dim Ritorno As String = ""
 
-        If File.Exists(NomeFileOrigine) Then
+        If TipoDB <> "SQLSERVER" Then
+            NomeFileOrigine = NomeFileOrigine.Replace("\", "/")
+            NomeFileOrigine = NomeFileOrigine.Replace("//", "/")
+
+            NomeFileDestinazione = NomeFileDestinazione.Replace("\", "/")
+            NomeFileDestinazione = NomeFileDestinazione.Replace("//", "/")
+        End If
+
+        If EsisteFile(NomeFileOrigine) Then
             If NomeFileOrigine.Trim <> "" And NomeFileDestinazione.Trim <> "" And NomeFileOrigine.Trim.ToUpper <> NomeFileDestinazione.Trim.ToUpper Then
                 Dim Ok As Boolean = True
 
-                If File.Exists(NomeFileDestinazione) Then
+                If EsisteFile(NomeFileDestinazione) Then
                     If SovraScrittura = False Then
                         NomeFileDestinazione = NomeFileEsistente(NomeFileDestinazione)
                     Else
@@ -165,7 +200,7 @@ Public Class GestioneFilesDirectory
                     Try
                         File.Copy(NomeFileOrigine, NomeFileDestinazione, True)
 
-                        Do Until (System.IO.File.Exists(NomeFileDestinazione))
+                        Do Until (EsisteFile(NomeFileDestinazione))
                             Threading.Thread.Sleep(1000)
                         Loop
 
@@ -188,9 +223,16 @@ Public Class GestioneFilesDirectory
 
     Public Function TornaNomeFileDaPath(Percorso As String) As String
         Dim Ritorno As String = ""
+        Dim Barra As String = "\"
+
+        If TipoDB <> "SQLSERVER" Then
+            Percorso = Percorso.Replace("\", "/")
+            Percorso = Percorso.Replace("//", "/")
+            Barra = "/"
+        End If
 
         For i As Integer = Percorso.Length To 1 Step -1
-            If Mid(Percorso, i, 1) = "/" Or Mid(Percorso, i, 1) = barra Then
+            If Mid(Percorso, i, 1) = Barra Then
                 Ritorno = Mid(Percorso, i + 1, Percorso.Length)
                 Exit For
             End If
@@ -201,6 +243,13 @@ Public Class GestioneFilesDirectory
 
     Public Function TornaEstensioneFileDaPath(Percorso As String) As String
         Dim Ritorno As String = ""
+        Dim Barra As String = "\"
+
+        If TipoDB <> "SQLSERVER" Then
+            Percorso = Percorso.Replace("\", "/")
+            Percorso = Percorso.Replace("//", "/")
+            Barra = "/"
+        End If
 
         For i As Integer = Percorso.Length To 1 Step -1
             If Mid(Percorso, i, 1) = "." Then
@@ -217,9 +266,16 @@ Public Class GestioneFilesDirectory
 
     Public Function TornaNomeDirectoryDaPath(Percorso As String) As String
         Dim Ritorno As String = ""
+        Dim Barra As String = "\"
+
+        If TipoDB <> "SQLSERVER" Then
+            Percorso = Percorso.Replace("\", "/")
+            Percorso = Percorso.Replace("//", "/")
+            Barra = "/"
+        End If
 
         For i As Integer = Percorso.Length To 1 Step -1
-            If Mid(Percorso, i, 1) = "/" Or Mid(Percorso, i, 1) = barra Then
+            If Mid(Percorso, i, 1) = Barra Then
                 Ritorno = Mid(Percorso, 1, i - 1)
                 Exit For
             End If
@@ -228,25 +284,34 @@ Public Class GestioneFilesDirectory
         Return Ritorno
     End Function
 
-    Public Sub CreaAggiornaFile(NomeFile As String, Cosa As String)
+    Public Function CreaAggiornaFile(NomeFile As String, Cosa As String) As String
+        Dim Ritorno As String = ""
+        Dim Barra As String = "\"
+
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+            Barra = "/"
+        End If
+
         Try
-            Dim path As String
-
-            If Percorso <> "" Then
-                path = Percorso & barra & NomeFile
-            Else
-                path = NomeFile
-            End If
-
-            path = path.Replace(barra & barra, barra)
-
             ' Create or overwrite the file.
-            Dim fs As FileStream = File.Create(path)
+            'Dim fs As FileStream = File.Create(path)
 
-            ' Add text to the file.
-            Dim info As Byte() = New UTF8Encoding(True).GetBytes(Cosa)
-            fs.Write(info, 0, info.Length)
-            fs.Close()
+            '' Add text to the file.
+            'Dim info As Byte() = New UTF8Encoding(True).GetBytes(Cosa)
+            'fs.Write(info, 0, info.Length)
+            'fs.Close()
+
+            ' Using fs As FileStream = File.Create(path)
+            Using fs As New FileStream(NomeFile, IO.FileMode.Create, IO.FileAccess.ReadWrite, FileShare.ReadWrite)
+                Dim info As Byte() = New UTF8Encoding(True).GetBytes(Cosa)
+                fs.Write(info, 0, info.Length)
+                fs.Flush()
+                fs.Close()
+            End Using
+
+            Ritorno = "*"
         Catch ex As Exception
             'Dim StringaPassaggio As String
             'Dim H As HttpApplication = HttpContext.Current.ApplicationInstance
@@ -255,14 +320,42 @@ Public Class GestioneFilesDirectory
             'StringaPassaggio = StringaPassaggio & "&Utente=" & H.Session("Nick")
             'StringaPassaggio = StringaPassaggio & "&Chiamante=" & H.Request.CurrentExecutionFilePath.ToUpper.Trim
             'H.Response.Redirect("Errore.aspx" & StringaPassaggio)
+            Ritorno = StringaErrore & " " & ex.Message
         End Try
-    End Sub
+
+        Return Ritorno
+    End Function
 
     Private objReader As StreamReader
 
     Public Sub ApreFilePerLettura(NomeFile As String)
+        Dim Barra As String = "\"
+
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+            Barra = "/"
+        End If
+
         objReader = New StreamReader(NomeFile)
     End Sub
+
+    Public Function EsisteFile(NomeFile As String) As Boolean
+        Dim Ritorno As Boolean = False
+        Dim Barra As String = "\"
+
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+            Barra = "/"
+        End If
+
+        If File.Exists(NomeFile) Then
+            Return True
+        Else
+            Return False
+        End If
+    End Function
 
     Public Function RitornaRiga() As String
         Return objReader.ReadLine()
@@ -273,18 +366,46 @@ Public Class GestioneFilesDirectory
     End Sub
 
     Public Function LeggeFileIntero(NomeFile As String) As String
-        If File.Exists(NomeFile) Then
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+        End If
+
+        If EsisteFile(NomeFile) Then
             Dim objReader As StreamReader = New StreamReader(NomeFile)
             Dim sLine As String = ""
             Dim Ritorno As String = ""
 
             Do
                 sLine = objReader.ReadLine()
-				Ritorno += sLine & "§"
-			Loop Until sLine Is Nothing
+                Ritorno += sLine & vbCrLf
+            Loop Until sLine Is Nothing
             objReader.Close()
 
             Return Ritorno
+        Else
+            Return ""
+        End If
+    End Function
+
+    Public Function LeggeFileInteroSenzaVbCrLf(NomeFile As String) As String
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+        End If
+
+        If EsisteFile(NomeFile) Then
+            Dim objReader As StreamReader = New StreamReader(NomeFile)
+            Dim sLine As String = ""
+            Dim Ritorno As StringBuilder = New StringBuilder
+
+            Do
+                sLine = objReader.ReadLine()
+                Ritorno.Append(sLine)
+            Loop Until sLine Is Nothing
+            objReader.Close()
+
+            Return Ritorno.ToString
         Else
             Return ""
         End If
@@ -306,6 +427,11 @@ Public Class GestioneFilesDirectory
     Dim Conta As Integer
 
     Private Sub LeggeTutto(Percorso As String, Filtro As String, lblAggiornamento As Label)
+        If TipoDB <> "SQLSERVER" Then
+            Percorso = Percorso.Replace("\", "/")
+            Percorso = Percorso.Replace("//", "/")
+        End If
+
         If Directory.Exists(Percorso) Then
             Dim di As New IO.DirectoryInfo(Percorso)
             Dim diar1 As IO.DirectoryInfo() = di.GetDirectories
@@ -351,6 +477,11 @@ Public Class GestioneFilesDirectory
     End Function
 
     Public Sub LeggeFilesDaDirectory(Percorso As String, Optional Filtro As String = "")
+        If TipoDB <> "SQLSERVER" Then
+            Percorso = Percorso.Replace("\", "/")
+            Percorso = Percorso.Replace("//", "/")
+        End If
+
         If Directory.Exists(Percorso) Then
             Dim di As New IO.DirectoryInfo(Percorso)
 
@@ -386,6 +517,15 @@ Public Class GestioneFilesDirectory
 
     Public Sub CreaDirectoryDaPercorso(Percorso As String)
         Dim Ritorno As String = Percorso
+
+        If TipoDB <> "SQLSERVER" Then
+            Ritorno = Ritorno.Replace("\", "/")
+            Ritorno = Ritorno.Replace("//", "/")
+
+            barra = "/"
+        Else
+            barra = "\"
+        End If
 
         For i As Integer = 1 To Ritorno.Length
             If Mid(Ritorno, i, 1) = barra Then
@@ -461,7 +601,12 @@ Public Class GestioneFilesDirectory
     End Sub
 
     Public Function TornaDataDiCreazione(NomeFile As String) As Date
-        If File.Exists(NomeFile) Then
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+        End If
+
+        If EsisteFile(NomeFile) Then
             Dim info As New FileInfo(NomeFile)
             Return info.CreationTime
         Else
@@ -470,7 +615,12 @@ Public Class GestioneFilesDirectory
     End Function
 
     Public Function TornaDataDiUltimaModifica(NomeFile As String) As Date
-        If File.Exists(NomeFile) Then
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+        End If
+
+        If EsisteFile(NomeFile) Then
             Dim info As New FileInfo(NomeFile)
             Return info.LastWriteTime
         Else
@@ -479,7 +629,12 @@ Public Class GestioneFilesDirectory
     End Function
 
     Public Function TornaDataUltimoAccesso(NomeFile As String) As Date
-        If File.Exists(NomeFile) Then
+        If TipoDB <> "SQLSERVER" Then
+            NomeFile = NomeFile.Replace("\", "/")
+            NomeFile = NomeFile.Replace("//", "/")
+        End If
+
+        If EsisteFile(NomeFile) Then
             Dim info As New FileInfo(NomeFile)
             Return info.LastAccessTime
         Else
@@ -490,6 +645,11 @@ Public Class GestioneFilesDirectory
     Private outputFile As StreamWriter
 
     Public Sub ApreFileDiTestoPerScrittura(Percorso As String)
+        If TipoDB <> "SQLSERVER" Then
+            Percorso = Percorso.Replace("\", "/")
+            Percorso = Percorso.Replace("//", "/")
+        End If
+
         outputFile = New StreamWriter(Percorso, True)
     End Sub
 
