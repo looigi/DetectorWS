@@ -659,8 +659,10 @@ Public Class GestioneFilesDirectory
 
     Public Sub ChiudeFileDiTestoDopoScrittura()
         outputFile.Flush()
-        outputFile.Close()
-    End Sub
+		outputFile.Close()
+		outputFile.Dispose()
+		outputFile = Nothing
+	End Sub
 
     Public Sub LockCartella(Cartella As String)
         Try
